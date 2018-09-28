@@ -4,32 +4,20 @@ author: Frederick Gnodtke
 about: >
   Convert MIDI data to RGB and send to MIDI strip server.
 subcommands:
-  - list-ports:
+  - midi-devices:
       about: List available MIDI ports.
   - start:
       about: Start the client.
       args:
-        - midi-port:
+        - midi:
             short: m
-            long: midi-port
+            long: midi
             help: MIDI port to connect to.
             takes_value: true
             required: true
-        - host:
-            short: h
-            long: host
+        - url:
+            short: u
+            long: url
             help: The host to connect to.
-            takes_value: true
-            required: true
-        - port:
-            short: p
-            long: port
-            help: The UDP port to connect to.
-            takes_value: true
-            required: true
-        - local-port:
-            short: l
-            long: local-port
-            help: The UDP port to bind to.
             takes_value: true
             required: true

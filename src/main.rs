@@ -3,11 +3,25 @@ extern crate hsl;
 extern crate midir;
 #[macro_use]
 extern crate clap;
+extern crate ws;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
+extern crate env_logger;
 
 use std::io::stdin;
-use std::net::UdpSocket;
 use hsl::HSL;
 use midir::{MidiInput, MidiInputConnection, Ignore};
+use ws::{connect, Sender};
+
+
+#[derive(Serialize)]
+struct Color {
+    r: u8,
+    g: u8,
+    b: u8,
+}
 
 struct ColorInfo {
     note: u8,
@@ -15,9 +29,7 @@ struct ColorInfo {
 }
 
 struct Client {
-    socket: UdpSocket,
-    port: u16,
-    host: String,
+    socket: Sender,
     stack: Vec<ColorInfo>,
 }
 
@@ -43,7 +55,11 @@ impl Client {
         let color = HSL { h: hue, s: saturation, l: lightness };
         let rgb = color.to_rgb();
         let buffer: [u8;3] = [rgb.0, rgb.1, rgb.2];
-        self.socket.send_to(&buffer, format!("{}:{}", self.host, self.port));
+        let json = serde_json::to_string(&Color { r: rgb.0, g: rgb.1, b: rgb.2 }).unwrap();
+        println!("Sending RGB {}", json);
+        if let Err(error) = self.socket.send(json) {
+            println!("Error sending message to server: {:?}", error);
+        }
     }
     fn midi_message(&mut self, timestamp: u64, payload: &[u8]) {
         match payload {
@@ -60,44 +76,42 @@ impl Client {
 }
 
 fn main() {
+    env_logger::init();
     use clap::App;
     let yml = load_yaml!("commandline.yml");
     let matches = App::from_yaml(yml).get_matches();
-    let mut midi = MidiInput::new("LED Strip").expect("Couldn't open MIDI device.");
-    midi.ignore(Ignore::None);
     match matches.subcommand() {
-        ("list-ports", Some(list_port_matches)) => {
+        ("midi-devices", Some(list_port_matches)) => {
+            let mut midi = MidiInput::new("LED Strip").expect("Couldn't open MIDI device.");
+            midi.ignore(Ignore::None);
             for i in 0..midi.port_count() {
-                println!("MIDI port {}: {}", i, midi.port_name(i).unwrap_or("Unkown".to_string()));
+                println!("MIDI device #{}: {}", i, midi.port_name(i).unwrap_or("Unkown".to_string()));
             }
         },
         ("start", Some(start_matches)) => {
             // Process arguments.
-            let midi_port = value_t!(start_matches, "midi-port", usize).expect("Not a valid MIDI port.");
-            let local_port = value_t!(start_matches, "local-port", u16).expect("Not a valid port.");
-            let port = value_t!(start_matches, "port", u16).expect("Not a valid port.");
-            let host = start_matches.value_of("host").expect("No host specified.");
+            let midi_device = value_t!(start_matches, "midi", usize).expect("Not a valid MIDI device.");
+            let url = start_matches.value_of("url").expect("No url specified.");
 
-            // Bind to UDP socket.
-            let socket = UdpSocket::bind(format!("0.0.0.0:{}", local_port)).expect("Couldn't bind to UDP socket.");
-            println!("UDP socket bound to 0.0.0.0:{} sending to {}:{}", local_port, host, port);
+            if let Err(error) = connect(url.clone(), move |socket| {
+                let mut midi = MidiInput::new("LED Strip").expect("Couldn't open MIDI device.");
+                midi.ignore(Ignore::None);
+                let port_name = midi.port_name(midi_device).unwrap_or("Unkown".to_string());
+                println!("Connected to MIDI device {} ({}).", midi_device, port_name);
 
-            // Confirm used MIDI port.
-            let port_name = midi.port_name(midi_port).unwrap_or("Unkown".to_string());
-            println!("Connected to MIDI port {} ({}).", midi_port, port_name);
+                // Create client.
+                let mut client = Client { socket, stack: vec!() };
+                // Listen for MIDI events and send them to the client.
+                let connection = midi.connect(midi_device, "LED Strip", move |timestamp, message, _| {
+                    client.midi_message(timestamp, message)
+                }, {}).expect("Couldn't connect to MIDI port.");
 
-            // Create client.
-            let mut client = Client { socket, stack: vec!(), port, host: String::from(host) };
-
-            // Listen for MIDI events and send them to the client.
-            let connection = midi.connect(midi_port, "LED Strip", move |timestamp, message, _| {
-                client.midi_message(timestamp, message)
-            }, {}).expect("Couldn't connect to MIDI port.");
-
-            // Exit once the user has pressed the enter key.
-            let mut input = String::new();
-            println!("Press [Enter] to exit.");
-            stdin().read_line(&mut input).expect("Unable to open stdin.");
+                println!("Connected to {}.", url);
+                loop {}
+                |msg| Ok(())
+            }) {
+                println!("Error with websocket connection: {:?}", error);
+            }
         },
         ("", None) => println!("Unkown command"),
         _ => unreachable!(),
