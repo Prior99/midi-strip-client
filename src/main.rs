@@ -1,3 +1,4 @@
+#![feature(drain_filter)]
 extern crate hsl;
 extern crate midir;
 #[macro_use]
@@ -8,33 +9,53 @@ use std::net::UdpSocket;
 use hsl::HSL;
 use midir::{MidiInput, MidiInputConnection, Ignore};
 
+struct ColorInfo {
+    note: u8,
+    velocity: u8,
+}
+
 struct Client {
     socket: UdpSocket,
     port: u16,
     host: String,
+    stack: Vec<ColorInfo>,
+}
+
+impl std::fmt::Debug for ColorInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "ColorInfo {{ note: {}, velocity: {} }}", self.note, self.velocity)
+    }
 }
 
 impl Client {
-    fn midi_message(&mut self, timestamp: u64, payload: &[u8]) {
-        if (payload.len() != 3) {
-            println!("Encountered unknown MIDI message with {} bytes of length.", payload.len());
-        }
-        match payload {
-            [144, note, velocity] => {
+    fn update(&mut self) {
+        let (hue, saturation, lightness) = match self.stack.last() {
+            Some(ColorInfo { note, velocity }) => {
                 let hue = (*note as f64) * 3_f64;
                 let saturation = 1_f64;
                 let lightness = (*velocity as f64) / 127_f64 * 0.7_f64;
-                let color = HSL { h: hue, s: saturation, l: lightness };
-                let rgb = color.to_rgb();
-                let buffer: [u8;3] = [rgb.0, rgb.1, rgb.2];
-                self.socket.send_to(&buffer, format!("{}:{}", self.host, self.port));
+                (hue, saturation, lightness)
+            },
+            None => {
+                (0_f64, 0_f64, 0_f64)
+            }
+        };
+        let color = HSL { h: hue, s: saturation, l: lightness };
+        let rgb = color.to_rgb();
+        let buffer: [u8;3] = [rgb.0, rgb.1, rgb.2];
+        self.socket.send_to(&buffer, format!("{}:{}", self.host, self.port));
+    }
+    fn midi_message(&mut self, timestamp: u64, payload: &[u8]) {
+        match payload {
+            [144, note, velocity] => {
+                self.stack.push(ColorInfo { note: *note, velocity: *velocity });
             },
             [128, note, velocity] => {
-                self.socket.send_to(&[0, 0, 0], format!("{}:{}", self.host, self.port));
+                self.stack.drain_filter(|info| info.note == *note && info.velocity == *velocity);
             },
             _ => {}
         }
-        println!("Message: {}: {:?}", payload.len(), payload);
+        self.update();
     }
 }
 
@@ -66,7 +87,7 @@ fn main() {
             println!("Connected to MIDI port {} ({}).", midi_port, port_name);
 
             // Create client.
-            let mut client = Client { socket, port, host: String::from(host) };
+            let mut client = Client { socket, stack: vec!(), port, host: String::from(host) };
 
             // Listen for MIDI events and send them to the client.
             let connection = midi.connect(midi_port, "LED Strip", move |timestamp, message, _| {
