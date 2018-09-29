@@ -1,4 +1,5 @@
 #![feature(drain_filter)]
+#![feature(duration_as_u128)]
 extern crate hsl;
 #[macro_use]
 extern crate clap;
@@ -11,6 +12,7 @@ extern crate midir;
 extern crate ws;
 extern crate serde;
 extern crate serde_json;
+extern crate palette;
 
 mod color;
 mod color_info;
@@ -69,13 +71,14 @@ fn main() {
         ("start", Some(start_matches)) => {
             // Process arguments.
             let midi_device_id = value_t!(start_matches, "midi", usize).expect("Not a valid MIDI device.");
+            let release = Duration::from_millis(value_t!(start_matches, "release", u64).expect("Not a valid number."));
             let url = start_matches.value_of("url").expect("No url specified.");
             let mut midi_client: Arc<RefCell<Option<MidiClient>>> = Arc::new(RefCell::new(None));
 
             if let Err(error) = connect(url.clone(), move |socket| {
                 let (tx, rx) = sync_channel(3);
                 midi_client.replace(Some(MidiClient::new(midi_device_id, tx)));
-                let client_arc = Arc::new(Mutex::new(Client::new(socket)));
+                let client_arc = Arc::new(Mutex::new(Client::new(socket, release)));
                 thread_update(client_arc.clone());
                 thread_messages(client_arc.clone(), rx);
                 info!("Connected to {}.", url);

@@ -1,46 +1,56 @@
-use hsl::HSL;
 use ws::{Sender};
 use color_info::ColorInfo;
 use color:: Color;
 use midi_message::MidiMessage;
+use std::time::{Duration, Instant};
+use palette::rgb::LinSrgba;
+use palette::Blend;
 
 pub struct Client {
     socket: Sender,
     stack: Vec<ColorInfo>,
+    release: Duration,
 }
 
 impl Client {
-    pub fn new(socket: Sender) -> Client {
-        Client { socket, stack: vec!() }
+    pub fn new(socket: Sender, release: Duration) -> Client {
+        Client { socket, release, stack: vec!() }
+    }
+
+    fn mix(&self, now: &Instant) -> LinSrgba {
+        let mut result = LinSrgba::new(0_f32, 0_f32, 0_f32, 1_f32);
+        let iterator = self.stack.iter()
+            .map(|color_info| LinSrgba::from(color_info.to_hsla(&now)));
+        for color in iterator {
+            result = color.over(result);
+        }
+        result
     }
 
     pub fn update(&mut self) {
-        let (hue, saturation, lightness) = match self.stack.last() {
-            Some(ColorInfo { note, velocity }) => {
-                let hue = (*note as f64) * 3_f64;
-                let saturation = 1_f64;
-                let lightness = (*velocity as f64) / 127_f64 * 0.7_f64;
-                (hue, saturation, lightness)
-            },
-            None => {
-                (0_f64, 0_f64, 0_f64)
-            }
-        };
-        let color = HSL { h: hue, s: saturation, l: lightness };
-        let rgb = color.to_rgb();
-        debug!("Sending RGB ({}, {}, {})", rgb.0, rgb.1, rgb.2);
-        let json = serde_json::to_string(&Color { r: rgb.0, g: rgb.1, b: rgb.2 }).unwrap();
+        let now = Instant::now();
+        let (r, g, b, _) = self.mix(&now).into_components();
+        debug!("Sending RGB ({}, {}, {})", r, g, b);
+        let json = serde_json::to_string(&Color {
+            r: (r * 255_f32) as u8,
+            g: (g * 255_f32) as u8,
+            b: (b * 255_f32) as u8,
+        }).unwrap();
         if let Err(error) = self.socket.send(json) {
             error!("Error sending message to server: {:?}", error);
         }
+        self.stack.drain_filter(|info| info.is_gone(&now));
     }
 
     fn handle_key_release(&mut self, note: u8) {
-        self.stack.drain_filter(|info| info.note == note);
+        match self.stack.iter_mut().find(|info| info.note == note) {
+            Some(color_info) => color_info.deleted = Some(Instant::now()),
+            None => {},
+        };
     }
 
     fn handle_key_press(&mut self, note: u8, velocity: u8) {
-        self.stack.push(ColorInfo { note, velocity });
+        self.stack.push(ColorInfo::new(note, velocity, self.release));
     }
 
     pub fn handle_message(&mut self, message: MidiMessage) {

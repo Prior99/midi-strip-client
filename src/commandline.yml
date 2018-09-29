@@ -26,3 +26,9 @@ subcommands:
             help: The host to connect to.
             takes_value: true
             required: true
+        - release:
+            short: r
+            long: release
+            help: The time for a note's color to decay after the key has been released in milliseconds.
+            takes_value: true
+            default_value: "0"
