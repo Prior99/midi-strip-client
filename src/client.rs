@@ -29,9 +29,10 @@ impl Client {
         };
         let color = HSL { h: hue, s: saturation, l: lightness };
         let rgb = color.to_rgb();
+        debug!("Sending RGB ({}, {}, {})", rgb.0, rgb.1, rgb.2);
         let json = serde_json::to_string(&Color { r: rgb.0, g: rgb.1, b: rgb.2 }).unwrap();
         if let Err(error) = self.socket.send(json) {
-            println!("Error sending message to server: {:?}", error);
+            error!("Error sending message to server: {:?}", error);
         }
     }
 

@@ -1,10 +1,12 @@
 #![feature(drain_filter)]
-
 extern crate hsl;
 #[macro_use]
 extern crate clap;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate log;
+extern crate simplelog;
 extern crate midir;
 extern crate ws;
 extern crate serde;
@@ -28,6 +30,14 @@ fn main() {
     use clap::App;
     let yml = load_yaml!("commandline.yml");
     let matches = App::from_yaml(yml).get_matches();
+    let log_level = if matches.is_present("verbose") {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Warn
+    };
+    if let Err(log_error) = simplelog::TermLogger::init(log_level, simplelog::Config::default()) {
+        println!("Couldn't setup logging: {}", log_error);
+    }
     match matches.subcommand() {
         ("midi-devices", Some(_)) => {
             let mut midi = create_midi();
@@ -45,10 +55,10 @@ fn main() {
                 let (tx, rx) = sync_channel(3);
                 midi_client.replace(Some(MidiClient::new(midi_device_id, tx)));
                 spawn(move || Client::new(socket).poll(rx));
-                println!("Connected to {}.", url);
+                info!("Connected to {}.", url);
                 |_| Ok(())
             }) {
-                println!("Error with websocket connection: {:?}", error);
+                error!("Error with websocket connection: {:?}", error);
             }
         },
         ("", None) => println!("Unkown command"),

@@ -3,6 +3,11 @@ version: 0.0.1
 author: Frederick Gnodtke
 about: >
   Convert MIDI data to RGB and send to MIDI strip server.
+args:
+  - verbose:
+      short: v
+      long: verbose
+      help: Enable verbose logging.
 subcommands:
   - midi-devices:
       about: List available MIDI ports.
