@@ -1,9 +1,8 @@
 use hsl::HSL;
 use ws::{Sender};
-use midi_message::MidiMessage;
-use std::sync::mpsc::{Receiver};
 use color_info::ColorInfo;
 use color:: Color;
+use midi_message::MidiMessage;
 
 pub struct Client {
     socket: Sender,
@@ -15,7 +14,7 @@ impl Client {
         Client { socket, stack: vec!() }
     }
 
-    fn update(&mut self) {
+    pub fn update(&mut self) {
         let (hue, saturation, lightness) = match self.stack.last() {
             Some(ColorInfo { note, velocity }) => {
                 let hue = (*note as f64) * 3_f64;
@@ -44,14 +43,11 @@ impl Client {
         self.stack.push(ColorInfo { note, velocity });
     }
 
-    pub fn poll(&mut self, rx: Receiver<MidiMessage>) {
-        for message in rx.iter() {
-            match message {
-                MidiMessage::KeyPress { note, velocity } => self.handle_key_press(note, velocity),
-                MidiMessage::KeyRelease { note } => self.handle_key_release(note),
-                _ => {},
-            };
-            self.update();
-        }
+    pub fn handle_message(&mut self, message: MidiMessage) {
+        match message {
+            MidiMessage::KeyPress { note, velocity } => self.handle_key_press(note, velocity),
+            MidiMessage::KeyRelease { note } => self.handle_key_release(note),
+            _ => {},
+        };
     }
 }
