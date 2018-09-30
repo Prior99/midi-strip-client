@@ -2,6 +2,7 @@ use std::fmt::{Debug, Result, Formatter};
 use std::time::{Instant, Duration};
 use palette::Hsla;
 
+#[derive(Debug)]
 pub struct ColorInfo {
     pub note: u8,
     pub velocity: u8,
@@ -39,11 +40,5 @@ impl ColorInfo {
             Some(deleted) => now.duration_since(deleted) > self.release,
             None => false,
         }
-    }
-}
-
-impl Debug for ColorInfo {
-    fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "ColorInfo {{ note: {}, velocity: {} }}", self.note, self.velocity)
     }
 }

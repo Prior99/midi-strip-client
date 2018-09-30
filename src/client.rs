@@ -40,6 +40,7 @@ impl Client {
             error!("Error sending message to server: {:?}", error);
         }
         self.stack.drain_filter(|info| info.is_gone(&now));
+        debug!("Stack: {:?}", self.stack);
     }
 
     fn handle_key_release(&mut self, note: u8) {
@@ -50,7 +51,16 @@ impl Client {
     }
 
     fn handle_key_press(&mut self, note: u8, velocity: u8) {
-        self.stack.push(ColorInfo::new(note, velocity, self.release));
+        if self.stack.iter().find(|info| info.note == note).is_none() {
+            self.stack.push(ColorInfo::new(note, velocity, self.release));
+            return;
+        }
+        self.stack.iter_mut()
+            .filter(|info| info.note == note)
+            .for_each(|info| {
+                info.deleted = None;
+                info.velocity = velocity;
+            });
     }
 
     pub fn handle_message(&mut self, message: MidiMessage) {
