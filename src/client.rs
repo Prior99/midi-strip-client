@@ -9,12 +9,13 @@ use palette::Blend;
 pub struct Client {
     socket: Sender,
     stack: Vec<ColorInfo>,
+    attack: Duration,
     release: Duration,
 }
 
 impl Client {
-    pub fn new(socket: Sender, release: Duration) -> Client {
-        Client { socket, release, stack: vec!() }
+    pub fn new(socket: Sender, attack: Duration, release: Duration) -> Client {
+        Client { socket, attack, release, stack: vec!() }
     }
 
     fn mix(&self, now: &Instant) -> LinSrgba {
@@ -52,7 +53,7 @@ impl Client {
 
     fn handle_key_press(&mut self, note: u8, velocity: u8) {
         if self.stack.iter().find(|info| info.note == note).is_none() {
-            self.stack.push(ColorInfo::new(note, velocity, self.release));
+            self.stack.push(ColorInfo::new(note, velocity, self.attack, self.release));
             return;
         }
         self.stack.iter_mut()

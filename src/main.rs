@@ -71,6 +71,7 @@ fn main() {
         ("start", Some(start_matches)) => {
             // Process arguments.
             let midi_device_id = value_t!(start_matches, "midi", usize).expect("Not a valid MIDI device.");
+            let attack = Duration::from_millis(value_t!(start_matches, "attack", u64).expect("Not a valid number."));
             let release = Duration::from_millis(value_t!(start_matches, "release", u64).expect("Not a valid number."));
             let url = start_matches.value_of("url").expect("No url specified.");
             let mut midi_client: Arc<RefCell<Option<MidiClient>>> = Arc::new(RefCell::new(None));
@@ -78,7 +79,7 @@ fn main() {
             if let Err(error) = connect(url.clone(), move |socket| {
                 let (tx, rx) = sync_channel(3);
                 midi_client.replace(Some(MidiClient::new(midi_device_id, tx)));
-                let client_arc = Arc::new(Mutex::new(Client::new(socket, release)));
+                let client_arc = Arc::new(Mutex::new(Client::new(socket, attack, release)));
                 thread_update(client_arc.clone());
                 thread_messages(client_arc.clone(), rx);
                 info!("Connected to {}.", url);
