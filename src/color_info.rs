@@ -1,4 +1,3 @@
-use std::fmt::{Debug, Result, Formatter};
 use std::time::{Instant, Duration};
 use palette::Hsla;
 
