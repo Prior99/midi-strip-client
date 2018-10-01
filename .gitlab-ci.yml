@@ -20,5 +20,5 @@ build:
     - cargo build --target x86_64-unknown-linux-gnu --release
   artifacts:
     paths:
-      - target/x86_64-pc-windows-gnu/release/midi-strip-client
+      - target/x86_64-pc-windows-gnu/release/midi-strip-client.exe
       - target/x86_64-unknown-linux-gnu/release/midi-strip-client
