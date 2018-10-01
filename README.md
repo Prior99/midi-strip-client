@@ -22,3 +22,7 @@ Build the project as usual with cargo:
 ```
 cargo build --release
 ```
+
+## Contributors
+
+ - Frederick Gnodtke

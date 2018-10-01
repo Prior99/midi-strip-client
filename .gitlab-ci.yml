@@ -1,0 +1,24 @@
+image: ubuntu:18.10
+
+stages:
+  - build
+  - deploy
+
+before_script:
+  - apt update -qq
+  - apt install curl gcc -qq -y
+  - curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
+
+build:
+  stage: build
+  script:
+    - apt install mingw-w64 alsa libasound2-dev pkg-config -qq -y
+    - export PATH=$PATH:$HOME/.cargo/bin
+    - echo -e '[target.x86_64-pc-windows-gnu]\nlinker = "x86_64-w64-mingw32-gcc"\nar = "x86_64-w64-mingw32-gcc-ar"' > $HOME/.cargo/config
+    - rustup target add x86_64-pc-windows-gnu
+    - cargo build --target x86_64-pc-windows-gnu --release
+    - cargo build --target x86_64-unknown-linux-gnu --release
+  artifacts:
+    paths:
+      - target/x86_64-pc-windows-gnu/release/midi-strip-client
+      - target/x86_64-unknown-linux-gnu/release/midi-strip-client
