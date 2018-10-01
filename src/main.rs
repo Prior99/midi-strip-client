@@ -34,8 +34,8 @@ use std::time::Duration;
 fn thread_update(client: Arc<Mutex<Client>>) -> JoinHandle<()> {
     spawn(move || {
         loop {
-            client.lock().unwrap().update();
             thread::sleep(Duration::from_millis(10));
+            client.lock().unwrap().update();
         }
     })
 }
