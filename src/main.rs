@@ -7,36 +7,34 @@ extern crate clap;
 extern crate serde_derive;
 #[macro_use]
 extern crate log;
-extern crate simplelog;
 extern crate midir;
-extern crate ws;
+extern crate palette;
 extern crate serde;
 extern crate serde_json;
-extern crate palette;
+extern crate simplelog;
+extern crate ws;
 
+mod client;
 mod color;
 mod color_info;
-mod client;
-mod midi_message;
 mod midi_client;
+mod midi_message;
 
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{sync_channel, Receiver};
-use std::cell::RefCell;
-use std::thread;
-use midi_client::{create_midi, MidiClient};
 use client::Client;
-use ws::{connect};
-use std::thread::{spawn, JoinHandle};
+use midi_client::{create_midi, MidiClient};
 use midi_message::MidiMessage;
+use std::cell::RefCell;
+use std::sync::mpsc::{sync_channel, Receiver};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::thread::{spawn, JoinHandle};
 use std::time::Duration;
+use ws::connect;
 
 fn thread_update(client: Arc<Mutex<Client>>) -> JoinHandle<()> {
-    spawn(move || {
-        loop {
-            thread::sleep(Duration::from_millis(10));
-            client.lock().unwrap().update();
-        }
+    spawn(move || loop {
+        thread::sleep(Duration::from_millis(10));
+        client.lock().unwrap().update();
     })
 }
 
@@ -65,14 +63,23 @@ fn main() {
         ("midi-devices", Some(_)) => {
             let mut midi = create_midi();
             for i in 0..midi.port_count() {
-                println!("MIDI device #{}: {}", i, midi.port_name(i).unwrap_or("Unkown".to_string()));
+                println!(
+                    "MIDI device #{}: {}",
+                    i,
+                    midi.port_name(i).unwrap_or("Unkown".to_string())
+                );
             }
-        },
+        }
         ("start", Some(start_matches)) => {
             // Process arguments.
-            let midi_device_id = value_t!(start_matches, "midi", usize).expect("Not a valid MIDI device.");
-            let attack = Duration::from_millis(value_t!(start_matches, "attack", u64).expect("Not a valid number."));
-            let release = Duration::from_millis(value_t!(start_matches, "release", u64).expect("Not a valid number."));
+            let midi_device_id =
+                value_t!(start_matches, "midi", usize).expect("Not a valid MIDI device.");
+            let attack = Duration::from_millis(
+                value_t!(start_matches, "attack", u64).expect("Not a valid number."),
+            );
+            let release = Duration::from_millis(
+                value_t!(start_matches, "release", u64).expect("Not a valid number."),
+            );
             let url = start_matches.value_of("url").expect("No url specified.");
             let mut midi_client: Arc<RefCell<Option<MidiClient>>> = Arc::new(RefCell::new(None));
 
@@ -87,7 +94,7 @@ fn main() {
             }) {
                 error!("Error with websocket connection: {:?}", error);
             }
-        },
+        }
         ("", None) => println!("Unkown command"),
         _ => unreachable!(),
     }

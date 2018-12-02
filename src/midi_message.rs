@@ -5,7 +5,7 @@ pub enum MidiMessage {
 }
 
 impl MidiMessage {
-    pub fn new(message: [u8;3]) -> MidiMessage {
+    pub fn new(message: [u8; 3]) -> MidiMessage {
         match message {
             [144, note, velocity] => MidiMessage::KeyPress { note, velocity },
             [128, note, _] => MidiMessage::KeyRelease { note },
