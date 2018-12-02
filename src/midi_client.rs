@@ -1,6 +1,6 @@
-use std::sync::mpsc::{SyncSender};
-use midir::{MidiInput, MidiInputConnection, Ignore};
 use midi_message::MidiMessage;
+use midir::{Ignore, MidiInput, MidiInputConnection};
+use std::sync::mpsc::SyncSender;
 
 pub struct MidiClient {
     _connection: MidiInputConnection<()>,
@@ -9,19 +9,31 @@ pub struct MidiClient {
 impl MidiClient {
     pub fn new(midi_device_id: usize, tx: SyncSender<MidiMessage>) -> MidiClient {
         let midi = create_midi();
-        let port_name = midi.port_name(midi_device_id).unwrap_or("Unkown".to_string());
-        info!("Connecting to MIDI device {} ({}).", midi_device_id, port_name);
+        let port_name = midi
+            .port_name(midi_device_id)
+            .unwrap_or("Unkown".to_string());
+        info!(
+            "Connecting to MIDI device {} ({}).",
+            midi_device_id, port_name
+        );
         let connection = midi
-            .connect(midi_device_id, "LED Strip", move |_, message, _| {
-                debug!("MIDI message received {:?}", message);
-                let mut array: [u8; 3] = Default::default();
-                array.copy_from_slice(message);
-                if let Err(error) = tx.send(MidiMessage::new(array)) {
-                    println!("Error communicating with client thread: {:?}", error);
-                }
-            }, {})
+            .connect(
+                midi_device_id,
+                "LED Strip",
+                move |_, message, _| {
+                    debug!("MIDI message received {:?}", message);
+                    let mut array: [u8; 3] = Default::default();
+                    array.copy_from_slice(message);
+                    if let Err(error) = tx.send(MidiMessage::new(array)) {
+                        println!("Error communicating with client thread: {:?}", error);
+                    }
+                },
+                {},
+            )
             .expect("Couldn't connect to MIDI port.");
-        MidiClient { _connection: connection }
+        MidiClient {
+            _connection: connection,
+        }
     }
 }
 

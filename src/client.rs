@@ -1,10 +1,10 @@
-use ws::{Sender};
+use color::Color;
 use color_info::ColorInfo;
-use color:: Color;
 use midi_message::MidiMessage;
-use std::time::{Duration, Instant};
 use palette::rgb::LinSrgba;
 use palette::Blend;
+use std::time::{Duration, Instant};
+use ws::Sender;
 
 pub struct Client {
     socket: Sender,
@@ -15,12 +15,19 @@ pub struct Client {
 
 impl Client {
     pub fn new(socket: Sender, attack: Duration, release: Duration) -> Client {
-        Client { socket, attack, release, stack: vec!() }
+        Client {
+            socket,
+            attack,
+            release,
+            stack: vec![],
+        }
     }
 
     fn mix(&self, now: &Instant) -> LinSrgba {
         let mut result = LinSrgba::new(0_f32, 0_f32, 0_f32, 1_f32);
-        let iterator = self.stack.iter()
+        let iterator = self
+            .stack
+            .iter()
             .map(|color_info| LinSrgba::from(color_info.to_hsla(&now)));
         for color in iterator {
             result = color.over(result);
@@ -36,7 +43,8 @@ impl Client {
             r: (r * 255_f32) as u8,
             g: (g * 255_f32) as u8,
             b: (b * 255_f32) as u8,
-        }).unwrap();
+        })
+        .unwrap();
         if let Err(error) = self.socket.send(json) {
             error!("Error sending message to server: {:?}", error);
         }
@@ -47,16 +55,18 @@ impl Client {
     fn handle_key_release(&mut self, note: u8) {
         match self.stack.iter_mut().find(|info| info.note == note) {
             Some(color_info) => color_info.deleted = Some(Instant::now()),
-            None => {},
+            None => {}
         };
     }
 
     fn handle_key_press(&mut self, note: u8, velocity: u8) {
         if self.stack.iter().find(|info| info.note == note).is_none() {
-            self.stack.push(ColorInfo::new(note, velocity, self.attack, self.release));
+            self.stack
+                .push(ColorInfo::new(note, velocity, self.attack, self.release));
             return;
         }
-        self.stack.iter_mut()
+        self.stack
+            .iter_mut()
             .filter(|info| info.note == note)
             .for_each(|info| {
                 info.deleted = None;
@@ -68,7 +78,7 @@ impl Client {
         match message {
             MidiMessage::KeyPress { note, velocity } => self.handle_key_press(note, velocity),
             MidiMessage::KeyRelease { note } => self.handle_key_release(note),
-            _ => {},
+            _ => {}
         };
     }
 }

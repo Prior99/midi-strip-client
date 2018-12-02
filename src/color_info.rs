@@ -1,5 +1,5 @@
-use std::time::{Instant, Duration};
 use palette::Hsla;
+use std::time::{Duration, Instant};
 
 #[derive(Debug)]
 pub struct ColorInfo {
@@ -45,7 +45,7 @@ impl ColorInfo {
                     let deleted_ms = deleted_since.as_millis() as f32;
                     deleted_ms / release_ms
                 }
-            },
+            }
             None => 0_f32,
         };
         let alpha = alpha_attack - alpha_deleted * alpha_attack;
